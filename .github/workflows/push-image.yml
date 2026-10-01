@@ -1,0 +1,82 @@
+name: Push Pet Clinic Image to GHCR
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Extract Maven version
+        id: get_version
+        run: |
+          python3 - <<'PY'
+          import os
+          import xml.etree.ElementTree as ET
+
+          namespace = {"m": "http://maven.apache.org/POM/4.0.0"}
+          project = ET.parse("pom.xml").getroot()
+          version = project.findtext("m:version", namespaces=namespace)
+          if not version:
+              raise SystemExit("Could not find the Maven project version in pom.xml")
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"version={version.strip()}\n")
+          PY
+
+      - name: Set up Java 17 and Maven cache
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: temurin
+          cache: maven
+
+      - name: Normalize GHCR image name
+        id: normalize_owner
+        run: |
+          image="ghcr.io/$(printf '%s' "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')"
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build image with Spring Boot Buildpacks
+        env:
+          IMAGE_NAME: ${{ steps.normalize_owner.outputs.image }}
+          VERSION: ${{ steps.get_version.outputs.version }}
+        run: ./mvnw -B -DskipTests spring-boot:build-image -Dspring-boot.build-image.imageName=${IMAGE_NAME}:${VERSION}
+
+      - name: Add version, SHA, and latest tags
+        env:
+          IMAGE_NAME: ${{ steps.normalize_owner.outputs.image }}
+          VERSION: ${{ steps.get_version.outputs.version }}
+        run: |
+          docker tag "$IMAGE_NAME:$VERSION" "$IMAGE_NAME:$GITHUB_SHA"
+          docker tag "$IMAGE_NAME:$VERSION" "$IMAGE_NAME:latest"
+
+      - name: Push image tags to GHCR
+        if: github.event_name != 'pull_request'
+        env:
+          IMAGE_NAME: ${{ steps.normalize_owner.outputs.image }}
+          VERSION: ${{ steps.get_version.outputs.version }}
+        run: |
+          docker push "$IMAGE_NAME:$VERSION"
+          docker push "$IMAGE_NAME:$GITHUB_SHA"
+          docker push "$IMAGE_NAME:latest"
