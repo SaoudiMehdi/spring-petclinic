@@ -1,0 +1,21 @@
+name: "Test Docker Action"
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  greet-user:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Dire bonjour
+        id: greeting
+        uses: ./my-custom-action-docker
+        with:
+          message: "Salut Jean"
+
+      - name: Vérifier la sortie
+        run: test "${{ steps.greeting.outputs.output-message }}" = "Salut Jean"

@@ -1,0 +1,22 @@
+name: "Exemple de workflow"
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  greet-user:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Dire bonjour
+        id: greeting
+        uses: ./my-custom-action-js
+        with:
+          username: "Jean"
+          greeting: "Salut"
+
+      - name: Afficher le message
+        run: echo "${{ steps.greeting.outputs.message }}"

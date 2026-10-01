@@ -1,0 +1,12 @@
+name: Custom Docker Message
+description: Logs a message and exposes it as an output.
+inputs:
+  message:
+    description: Message to display and expose.
+    required: true
+outputs:
+  output-message:
+    description: The message provided to the action.
+runs:
+  using: docker
+  image: Dockerfile
