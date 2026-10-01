@@ -1,0 +1,12 @@
+name: CI - Hello Template
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  call-hello-template:
+    uses: ./.github/workflows/hello-template.yml
+    with:
+      prenom: Mona
