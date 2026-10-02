@@ -80,3 +80,29 @@ jobs:
           docker push "$IMAGE_NAME:$VERSION"
           docker push "$IMAGE_NAME:$GITHUB_SHA"
           docker push "$IMAGE_NAME:latest"
+
+  update-gitops:
+    needs: build-and-push
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout infrastructure repository
+        uses: actions/checkout@v4
+        with:
+          repository: SaoudiMehdi/kustomize
+          token: ${{ secrets.GITOPS_PAT }}
+          path: infra-repo
+
+      - name: Update image version
+        working-directory: ./infra-repo/dev
+        run: |
+          kustomize edit set image spring-petclinic=ghcr.io/saoudimehdi/spring-petclinic:${{ github.sha }}
+
+      - name: Commit and push infrastructure update
+        working-directory: ./infra-repo
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+          git add .
+          git commit -m "Auto-update image to tag ${{ github.sha }}"
+          git push
